@@ -6,8 +6,13 @@
 ## Product Vision
 
 FOR: developers or project builders that would like to have their projects Read Me updated and configured automatically
+
 WHO: anyone working with a large codebase
+
 The Write Me is a developer documentation automation tool
+
 THAT automatically updates the Read Me based on the codebase
+
 UNLIKE other Read Me generators
+
 OUR PRODUCT continuously updates the Read Me throughtout the process
