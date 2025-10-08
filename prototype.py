@@ -1,5 +1,35 @@
-import os, datetime
+import os, datetime, openai, json
 
+"Generates README content based on commit messages"
+def generate_readme(commits):
+    commit_summary = "\n".join([f"- {commit}" for commit in commits])
+    prompt = f"""
+    Based on these commit messages, generate a clear and informative README.md content:
+
+    {commit_summary}
+
+    Please include:
+    1. A brief project description
+    2. Key features based on the commits
+    3. Setup/installation instructions if applicable
+    4. Dependencies or requirements
+    5. Usage examples if relevant
+    Format the response in proper Markdown.
+    """
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates README content from commit messages."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=800,
+            temperature=0.7,
+        )
+        return response.choices[0].message['content'].strip()
+    except Exception as e:
+        return f"Error generating README: {str(e)}"
+    
 "Counts amount of files in GitHub"
 def count_files(project_path):
     file_count = 0
@@ -32,8 +62,10 @@ def parse_commit(commit):
         "content": content
         }
 
-# will return a string that can be added to README
+'''
+# Update readme based on ai output
 def build_readme(commits): 
+    res = generate_readme(commits)
     res = ""
 
     for commit in commits:
@@ -42,7 +74,7 @@ def build_readme(commits):
         res += f"{c_type}, {c_content}"
     
     return res
-        
+'''
 
         
 
