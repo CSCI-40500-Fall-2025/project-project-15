@@ -1,4 +1,9 @@
 import os, datetime, openai, json
+from dotenv import load_dotenv
+
+load_dotenv()
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 "Generates README content based on commit messages"
 def generate_readme(commits):
@@ -33,7 +38,7 @@ def generate_readme(commits):
 "Counts amount of files in GitHub"
 def count_files(project_path):
     file_count = 0
-    exclude = {".git", ".github", ".vscode", ".devcontainer"}
+    exclude = {".git", ".github", ".vscode", ".devcontainer", "venv", "env", "__pycache__", ".pytest_cache"}
     dir_names = []
 
     for root, dir, file, in os.walk(project_path):
@@ -86,13 +91,6 @@ if __name__ == "__main__":
     
     print(summary)
 
-    # saves previous content
-    with open("README.md", "r") as f:
-        content = f.read()
-
-    with open("README.md", "w") as f:
-        f.write(content + "\n" + summary + "\n")
-
     sample_commits = [
     "feat: initialize SwiftUI project with base tab navigation",
     "feat: add Activity model and Core Data integration",
@@ -101,5 +99,16 @@ if __name__ == "__main__":
     "refactor: extract ActivityFormView for reuse"
     ]      
 
-    parsed_commit = parse_commits(sample_commits)
+    readme_content = generate_readme(sample_commits)
+
+    # saves previous content
+    with open("README.md", "r") as f:
+        content = f.read()
+
+    with open("README.md", "w") as f:
+        f.write(content + "\n" + readme_content + "\n" + summary + "\n")
+
+    parsed_commits = [parse_commit(commit) for commit in sample_commits]
+
+
     
