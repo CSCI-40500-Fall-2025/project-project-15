@@ -1,9 +1,11 @@
-import os, datetime, openai, json
+import os, datetime, json
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+#Initialize oai client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 "Generates README content based on commit messages"
 def generate_readme(commits):
@@ -22,7 +24,7 @@ def generate_readme(commits):
     Format the response in proper Markdown.
     """
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that generates README content from commit messages."},
@@ -31,10 +33,10 @@ def generate_readme(commits):
             max_tokens=800,
             temperature=0.7,
         )
-        return response.choices[0].message['content'].strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Error generating README: {str(e)}"
-    
+
 "Counts amount of files in GitHub"
 def count_files(project_path):
     file_count = 0
@@ -44,7 +46,7 @@ def count_files(project_path):
     for root, dir, file, in os.walk(project_path):
         dir[:] = [d for d in dir if d not in exclude]
         dir_names.append(file)
-        
+
         for f in file:
             if not f.startswith("."):
                 file_count+=1
@@ -61,7 +63,7 @@ def parse_commit(commit):
     else: 
         type_commit = "other"
         content = commit.strip() 
-    
+
     return {
         "type": type_commit, 
         "content": content
@@ -81,14 +83,14 @@ def build_readme(commits):
     return res
 '''
 
-        
+
 
 if __name__ == "__main__":
     project_path = "."
     count, names = count_files(project_path)
-    
+
     summary = (f"total files in repo: {count}\n" f"file names: {names}\n" f"last updated: {datetime.datetime.now()}")
-    
+
     print(summary)
 
     sample_commits = [
@@ -111,4 +113,4 @@ if __name__ == "__main__":
     parsed_commits = [parse_commit(commit) for commit in sample_commits]
 
 
-    
+
