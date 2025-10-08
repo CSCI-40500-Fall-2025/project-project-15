@@ -111,11 +111,17 @@ if __name__ == "__main__":
 
     readme_content = generate_readme(commits)
 
-    # saves previous content
-    with open("README.md", "r") as f:
-        content = f.read()
+    #check if README exists
+    try:
+        with open("README.md", "r") as f:
+            existing_content = f.read()
+    except FileNotFoundError:
+        existing_content = ""
 
+    #write new content (replace)
     with open("README.md", "w") as f:
-        f.write(content + "\n" + readme_content + "\n" + summary + "\n")
+        if existing_content and not existing_content.endswith('\n'):
+            existing_content += '\n'
+        f.write(f"{readme_content}\n\n---\n\n{summary}\n")
 
 
