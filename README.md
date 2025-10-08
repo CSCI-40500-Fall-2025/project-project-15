@@ -1,45 +1,41 @@
 # Project Title
 
-This project is a handy tool designed to automate the generation of README.md files for your GitHub repositories. It leverages the power of AI and GitHub actions to create informative and up-to-date README files based on your recent commit history. The tool also includes a feature to generate a changelog and provides valuable information such as the number of files, their names, and the timestamp for when the README was updated.
+This project is a sophisticated tool designed to automate the generation of README files. It features the capability to read repository commits and auto-generate a changelog based on recent commit history. It also includes AI functionality, Github actions workflow, and an innovative user feature.
 
 ## Key Features
 
-- **GitHub Actions Workflow**: Automatically runs a workflow on every push to the repository.
-- **Repository Commit Reader**: Reads the commit history of the repository to generate up-to-date README files.
-- **AI Functionality**: Uses AI to generate informative README content based on commit messages.
-- **Auto-generation of Changelog**: Creates a changelog based on recent commit history.
-- **File Information**: The README includes the number of files, their names, and the timestamp for when the README was updated.
+1. **GitHub Actions Workflow**: Automated workflow set up using GitHub actions to automatically run on push.
+
+2. **AI Functionality**: The tool incorporates AI to enhance its functionality and performance.
+
+3. **Read Repository Commits**: The tool can read repository commits to keep track of changes.
+
+4. **Auto-generate Changelog based on Commit History**: It can generate a dynamic changelog based on the recent commit history.
+
+5. **Automated README Generation**: The project has a unique feature of auto-generating README files with details such as the number of files, their names, and the timestamp for when the README was last updated.
 
 ## Setup/Installation
 
-To setup this tool in your project, please follow the steps given below:
-
-1. Clone the repository.
-2. Delete the .gitignore and .env files if they exist in your project directory.
-3. Create a main.yml file in the .github/workflows directory.
-4. Update the main.yml file with the necessary GitHub actions to run the workflow automatically on every push.
+This project uses GitHub actions which automatically run on push. To get started, simply clone the repository and follow the instructions in the main.yml file.
 
 ## Dependencies
 
-This tool requires the following software to function properly:
-
-- A GitHub account
-- Access to GitHub actions
+This project depends on OpenAI for some of its AI functionality. Make sure to handle any environment changes as necessary.
 
 ## Usage
 
-To use this tool, make sure to follow the setup instructions provided above. Once done, every time you push to your repository, the GitHub action will trigger and update your README file with the latest commit information, including a changelog.
+Once successfully installed and setup, this tool automatically generates a README file whenever there is a new commit. It also updates the README file with a summary of the latest commit. For example, if a new feature is added or a bug is fixed, this will be noted in the README file. 
 
-For example, if you've committed with the message "added new feature", your README will automatically update with this information under the changelog.
+A prototype is also available that provides instructions on how to use this tool. It includes features such as adding an online IDE URL and a deadline. 
 
-## Additional Information
+---
 
-This tool also includes a prototype that provides usage instructions and an online IDE URL and deadline if applicable.
+**NOTE**
 
-Please note that this tool is currently in its prototype phase and may have some bugs. We're working hard to provide a smooth user experience.
+This project is a prototype and not suitable for production use. It is intended for demonstration purposes only.
 
 ---
 
 total files in repo: 4
-file names: [['requirements.txt', 'example_file.py', '.gitignore', 'README.md', 'prototype.py']]
-last updated: 2025-10-08 16:22:44.465316
+file names: [['requirements.txt', 'README.md', '.gitignore', '.env', 'example_file.py', 'prototype.py']]
+last updated: 2025-10-08 15:42:56.004943
