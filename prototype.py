@@ -1,6 +1,7 @@
 import os, datetime, json
 from dotenv import load_dotenv
 from openai import OpenAI
+import git
 
 load_dotenv()
 
@@ -37,6 +38,7 @@ def generate_readme(commits):
     except Exception as e:
         return f"Error generating README: {str(e)}"
 
+
 "Counts amount of files in GitHub"
 def count_files(project_path):
     file_count = 0
@@ -53,6 +55,19 @@ def count_files(project_path):
 
     return file_count, dir_names
 
+
+"Gets last n commits from git repo"
+def get_commits(repo_path=".", n=100):
+    try:
+        repo = git.Repo(repo_path)
+        commits = []
+        for commit in repo.iter_commits(max_count=n):
+            commits.append(commit.message.strip().split('\n')[0])  # Get first line only
+        return commits
+    except Exception as e:
+        print(f"Error accessing git repository: {str(e)}")
+        return []
+
 # commits -> array of strings
 # commits[i] = "<type>: <commit msg>"
 def parse_commit(commit): 
@@ -68,21 +83,6 @@ def parse_commit(commit):
         "type": type_commit, 
         "content": content
         }
-
-'''
-# Update readme based on ai output
-def build_readme(commits): 
-    res = generate_readme(commits)
-    res = ""
-
-    for commit in commits:
-        commit_info = parse_commit(commit)
-        c_type, c_content = commit_info["type"], commit_info["content"]
-        res += f"{c_type}, {c_content}"
-    
-    return res
-'''
-
 
 
 if __name__ == "__main__":
@@ -101,7 +101,15 @@ if __name__ == "__main__":
     "refactor: extract ActivityFormView for reuse"
     ]      
 
-    readme_content = generate_readme(sample_commits)
+    repo_commits = get_commits(project_path)
+    if repo_commits:
+        print(f"Using repo commits: {repo_commits}")
+        commits = repo_commits
+    else:
+        commits = sample_commits
+
+
+    readme_content = generate_readme(commits)
 
     # saves previous content
     with open("README.md", "r") as f:
@@ -109,8 +117,5 @@ if __name__ == "__main__":
 
     with open("README.md", "w") as f:
         f.write(content + "\n" + readme_content + "\n" + summary + "\n")
-
-    parsed_commits = [parse_commit(commit) for commit in sample_commits]
-
 
 
