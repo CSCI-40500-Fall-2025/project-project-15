@@ -80,7 +80,6 @@ This section will be updated once the setup and installation process is finalize
 
 **Logging:** Structured logs emitted in Actions with redaction for secrets and prompts  
 **Alerts:** On failure, annotate the job and optionally create an issue label
-## Dependencies
 ---
 ### 6) Integration Service
 
@@ -104,7 +103,7 @@ This section will be updated once the setup and installation process is finalize
 **Packaging:** Reusable GitHub Action (composite or JavaScript action) and Docker image for deterministic runs  
 **Config:** YAML file with sections to manage, globs to scan, changelog style, and write mode  
 **Versioning:** Semantic versioning (SemVer) for Action releases and a changelog for the bot itself
-
+---
 ### Architecture Diagram
 
 | **User Interface**              |
