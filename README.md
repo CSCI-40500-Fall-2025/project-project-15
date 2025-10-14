@@ -42,14 +42,14 @@ This project is a helpful assistant that automates the generation of README file
 
 ---
 
-### 1) Interface Layer
+### 1) User Interface
 
 **Interface:**  
 GitHub Actions (primary), manual workflow dispatch, scheduled cron, optional CLI.
 
 ---
 
-### 2) Auth & Access Layer
+### 2) Auth & Access Service
 
 **GitHub:** GitHub application  
 **AI Service:** API key via Actions secrets  
@@ -58,7 +58,7 @@ GitHub Actions (primary), manual workflow dispatch, scheduled cron, optional CLI
 
 ---
 
-### 3) Workflow Layer
+### 3) Workflow Service
 
 **Coordinator:** A small runner script (Node/TypeScript or Python) that:  
 - Parses inputs (branch, range of commits)  
@@ -68,22 +68,28 @@ GitHub Actions (primary), manual workflow dispatch, scheduled cron, optional CLI
 
 ---
 
-### 5) Integration Layer
+
+### 4) AI Integration Layer
+
+**AI Adapter:** Centralized component for prompts, model choice, temperature, and token accounting
+**Rate/Cost Controls:** Per-run token ceiling with fallbacks to template-only mode if exceeded
+---
+
+### 5) Observability Layer
+This section will be updated once the setup and installation process is finalized.
+
+**Logging:** Structured logs emitted in Actions with redaction for secrets and prompts  
+**Alerts:** On failure, annotate the job and optionally create an issue label
+## Dependencies
+---
+### 6) Integration Service
 
 **GitHub API Adapter:** Commits, tree/listing, contents read/write, PR comments, releases/tags  
 **Formatter Adapters:** Markdown renderer, diff/highlight  
 
-
 ---
 
-### 5) AI Integration Layer
-
-**AI Adapter:** Centralized component for prompts, model choice, temperature, and token accounting
-**Rate/Cost Controls:** Per-run token ceiling with fallbacks to template-only mode if exceeded
-
----
-
-### 7) Data & Transaction Layer
+### 7) Data Service
 
 **State Store (lightweight):**  
 - Last successful run metadata (README hash, token usage)  
@@ -91,20 +97,9 @@ GitHub Actions (primary), manual workflow dispatch, scheduled cron, optional CLI
 - Can be a JSON artifact if mono-repo, or stored in S3/GCS if multi-repo  
 
 **Atomic Updates:** Write to a temporary file, validate, then commit or open a PR to avoid force-push accidents
-
 ---
 
-### 8) Observability Layer
-This section will be updated once the setup and installation process is finalized.
-
-**Logging:** Structured logs emitted in Actions with redaction for secrets and prompts  
-**Alerts:** On failure, annotate the job and optionally create an issue label
-## Dependencies
-
----
-Please ensure you have the following requirements before starting:
-
-### 10) Delivery Service
+### 8) Delivery Service
 
 **Packaging:** Reusable GitHub Action (composite or JavaScript action) and Docker image for deterministic runs  
 **Config:** YAML file with sections to manage, globs to scan, changelog style, and write mode  
