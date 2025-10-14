@@ -47,7 +47,7 @@ This project is a helpful assistant that automates the generation of README file
 **Interface:**  
 GitHub Actions (primary), manual workflow dispatch, scheduled cron, optional CLI.
 
----
+
 
 ### 2) Auth & Access Service
 
@@ -56,7 +56,7 @@ GitHub Actions (primary), manual workflow dispatch, scheduled cron, optional CLI
 **Secret Hygiene:** OpenID Connect to cloud secret manager or GitHub encrypted secrets  
 **Guardrails:** Per-repo allowlist, branch protection awareness, dry-run flag
 
----
+
 
 ### 3) Workflow Service
 
@@ -66,27 +66,24 @@ GitHub Actions (primary), manual workflow dispatch, scheduled cron, optional CLI
 - Decides write-back mode (commit vs PR vs artifact only)  
 - Handles resilience through retries or backoff
 
----
-
 
 ### 4) AI Integration Layer
 
 **AI Adapter:** Centralized component for prompts, model choice, temperature, and token accounting
 **Rate/Cost Controls:** Per-run token ceiling with fallbacks to template-only mode if exceeded
----
+
 
 ### 5) Observability Layer
 This section will be updated once the setup and installation process is finalized.
 
 **Logging:** Structured logs emitted in Actions with redaction for secrets and prompts  
 **Alerts:** On failure, annotate the job and optionally create an issue label
----
+
 ### 6) Integration Service
 
 **GitHub API Adapter:** Commits, tree/listing, contents read/write, PR comments, releases/tags  
 **Formatter Adapters:** Markdown renderer, diff/highlight  
 
----
 
 ### 7) Data Service
 
@@ -96,7 +93,6 @@ This section will be updated once the setup and installation process is finalize
 - Can be a JSON artifact if mono-repo, or stored in S3/GCS if multi-repo  
 
 **Atomic Updates:** Write to a temporary file, validate, then commit or open a PR to avoid force-push accidents
----
 
 ### 8) Delivery Service
 
