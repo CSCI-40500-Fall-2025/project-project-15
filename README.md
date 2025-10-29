@@ -212,3 +212,9 @@ Please refer to the commit history for the latest updates and bug fixes.
 total files in repo: 4
 file names: [['requirements.txt', 'example_file.py', '.gitignore', 'README.md', 'prototype.py']]
 last updated: 2025-10-14 07:17:48.055481
+
+## Tests
+
+[![Run Tests](https://github.com/CSCI-40500-Fall-2025/project-project-15/actions/workflows/main.yml/badge.svg)](https://github.com/CSCI-40500-Fall-2025/project-project-15/actions/workflows/main.yml)
+
+
