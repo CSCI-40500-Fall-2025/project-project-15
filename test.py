@@ -5,7 +5,6 @@ import shutil
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 from prototype import count_files, parse_commit
-import git
 
 class TestParseCommit:
     '''
