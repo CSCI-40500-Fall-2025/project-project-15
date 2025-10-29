@@ -215,5 +215,7 @@ last updated: 2025-10-14 07:17:48.055481
 
 ## Tests
 
+https://github.com/CSCI-40500-Fall-2025/project-project-15/blob/fe54c974716d7728f7b9797dc5dc9ec02175aeb5/README.md#tests
+
 [![Run Tests](https://github.com/CSCI-40500-Fall-2025/project-project-15/actions/workflows/main.yml/badge.svg)](https://github.com/CSCI-40500-Fall-2025/project-project-15/actions/workflows/main.yml)
 
