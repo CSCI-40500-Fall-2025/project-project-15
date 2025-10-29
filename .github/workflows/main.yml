@@ -29,7 +29,3 @@ jobs:
     - name: Run tests
       run: |
         pytest test.py -v --tb=short
-    
-    - name: Generate coverage report
-      run: |
-        pytest test.py --cov=prototype --cov-report=term-missing
