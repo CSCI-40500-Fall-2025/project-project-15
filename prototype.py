@@ -6,7 +6,7 @@ import git
 load_dotenv()
 
 #Initialize oai client
-#client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 "Generates README content based on commit messages"
 def generate_readme(commits):
