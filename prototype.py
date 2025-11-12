@@ -136,15 +136,32 @@ def create_pr_with_readme(readme_content, summary):
         # Base64 encoding is REQUIRED by GitHub Contents API
         content_b64 = base64.b64encode(full_readme.encode()).decode()
         
+        # Get current README SHA if it exists
+        readme_sha = None
+        try:
+            r = requests.get(
+                f"{api}/repos/{repo}/contents/README.md",
+                headers=headers,
+                params={"ref": branch}
+            )
+            if r.status_code == 200:
+                readme_sha = r.json()["sha"]
+        except requests.exceptions.RequestException:
+            pass  # File doesn't exist yet, that's fine
+        
         # Update README on the new branch
+        update_data = {
+            "message": "docs: auto-update README",
+            "content": content_b64,
+            "branch": branch
+        }
+        if readme_sha:
+            update_data["sha"] = readme_sha
+        
         r = requests.put(
             f"{api}/repos/{repo}/contents/README.md",
             headers=headers,
-            json={
-                "message": "docs: auto-update README",
-                "content": content_b64,
-                "branch": branch
-            }
+            json=update_data
         )
         r.raise_for_status()
         
