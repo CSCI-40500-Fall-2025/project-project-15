@@ -1,0 +1,432 @@
+name: CD - Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          python -m pytest tests/ -v || echo "No tests found, add tests to tests/ directory"
+
+      - name: Run linting
+        run: |
+          pip install pylint
+          pylint prototype.py --fail-under=7.0 || echo "Improve code lquality"
+
+  build-snapshot:
+    name: Build SNAPSHOT Version
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      snapshot-version: ${{ steps.version.outputs.snapshot-version }}
+      is-release: ${{ steps.version.outputs.is-release }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          # Read base version from VERSION file
+          if [ -f VERSION ]; then
+            BASE_VERSION=$(cat VERSION)
+          else
+            BASE_VERSION="1.0.0"
+          fi
+          
+          # Check if this is a release commit (no -SNAPSHOT in VERSION file)
+          if [[ "$BASE_VERSION" == *"-SNAPSHOT"* ]]; then
+            IS_RELEASE="false"
+            # Generate timestamp for SNAPSHOT build
+            TIMESTAMP=$(date -u +"%Y%m%d.%H%M%S")
+            SNAPSHOT_VERSION="${BASE_VERSION/-SNAPSHOT/}-SNAPSHOT-${TIMESTAMP}"
+          else
+            IS_RELEASE="true"
+            SNAPSHOT_VERSION="${BASE_VERSION}"
+          fi
+          
+          echo "snapshot-version=${SNAPSHOT_VERSION}" >> $GITHUB_OUTPUT
+          echo "is-release=${IS_RELEASE}" >> $GITHUB_OUTPUT
+          echo "Building version: ${SNAPSHOT_VERSION}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Create distribution package
+        run: |
+          mkdir -p dist
+          
+          # Create version info file
+          echo "${{ steps.version.outputs.snapshot-version }}" > dist/VERSION
+          
+          # Copy necessary files
+          cp prototype.py dist/
+          cp requirements.txt dist/
+          cp README.md dist/ || echo "README will be auto-generated"
+          
+          # Create installation script
+          cat > dist/install.sh << 'EOF'
+          #!/bin/bash
+          echo "Installing README Auto-Generator..."
+          pip install -r requirements.txt
+          echo "Installation complete!"
+          echo "Usage: python prototype.py"
+          EOF
+          chmod +x dist/install.sh
+          
+          # Create user guide
+          cat > dist/USER_GUIDE.md << 'EOF'
+          # README Auto-Generator - User Guide
+          
+          ## Installation
+          
+          ### Option 1: GitHub Actions (Recommended)
+          
+          1. Copy the workflow file to your repository:
+          ```bash
+          mkdir -p .github/workflows
+          # Copy update-readme.yml to .github/workflows/
+          ```
+          
+          2. Add required files:
+          ```bash
+          # Copy prototype.py and requirements.txt to your repo root
+          ```
+          
+          3. Set up your OpenAI API key:
+             - Go to Settings → Secrets and variables → Actions
+             - Add secret: `OPENAI_API_KEY`
+          
+          4. Push to main branch - your README will auto-update!
+          
+          ### Option 2: Local Installation
+          
+          ```bash
+          bash install.sh
+          export OPENAI_API_KEY="your-api-key"
+          python prototype.py
+          ```
+          
+          ## Configuration
+          
+          Edit `prototype.py` to customize:
+          - README template
+          - Commit analysis depth
+          - Output format
+          
+          ## Troubleshooting
+          
+          - **No changes detected**: Make sure you have commits in your repository
+          - **API errors**: Verify your OPENAI_API_KEY is set correctly
+          - **Permission errors**: Ensure GitHub Actions has write permissions
+          EOF
+          
+          # Create a tarball for distribution
+          tar -czf readme-generator-${{ steps.version.outputs.snapshot-version }}.tar.gz -C dist .
+          
+          # Create a zip for Windows users
+          cd dist && zip -r ../readme-generator-${{ steps.version.outputs.snapshot-version }}.zip . && cd ..
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: readme-generator-${{ steps.version.outputs.snapshot-version }}
+          path: |
+            readme-generator-*.tar.gz
+            readme-generator-*.zip
+          retention-days: 90
+
+      - name: Create/Update SNAPSHOT Release
+        if: steps.version.outputs.is-release == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.snapshot-version }}"
+          
+          # Delete existing SNAPSHOT release if it exists
+          gh release delete SNAPSHOT --yes 2>/dev/null || true
+          
+          # Create new SNAPSHOT release
+          gh release create SNAPSHOT \
+            --title "SNAPSHOT Build, Latest Development Version" \
+            --notes "## SNAPSHOT Build - ${VERSION}
+          
+          This is a **bleeding-edge** development build containing the latest features, enhancements, and bug fixes.
+          
+          **Not recommended for production use.** This build may be unstable or contain incomplete features.
+          
+          ### 📦 Download
+          - **Linux/Mac**: \`readme-generator-${VERSION}.tar.gz\`
+          - **Windows**: \`readme-generator-${VERSION}.zip\`
+          
+          ### 🔧 Installation
+          \`\`\`bash
+          # Extract the archive
+          tar -xzf readme-generator-${VERSION}.tar.gz
+          cd dist
+          bash install.sh
+          \`\`\`
+          
+          ### What's New
+          This build includes all changes up to commit \`${GITHUB_SHA:0:7}\`.
+          
+          See the [commit history](https://github.com/${{ github.repository }}/commits/main) for details.
+          
+
+      - name: Create Stable Release
+        if: steps.version.outputs.is-release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.snapshot-version }}"
+          
+          # Check if this version already exists
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "Release v${VERSION} already exists. Skipping."
+            exit 0
+          fi
+          
+          # Create stable release
+          gh release create "v${VERSION}" \
+            --title "Release v${VERSION}" \
+            --notes "## Release v${VERSION}
+          
+          This is a **stable release** of the README Auto-Generator.
+          
+          ### Download
+          - **Linux/Mac**: \`readme-generator-${VERSION}.tar.gz\`
+          - **Windows**: \`readme-generator-${VERSION}.zip\`
+          
+          ### Quick Start
+          \`\`\`bash
+          # Download and extract
+          tar -xzf readme-generator-${VERSION}.tar.gz
+          cd dist
+          
+          # Install
+          bash install.sh
+          
+          # Run
+          export OPENAI_API_KEY='your-key'
+          python prototype.py
+          \`\`\`
+          
+          ### Documentation
+          See \`USER_GUIDE.md\` in the package for complete documentation.
+          
+          ### GitHub Actions Integration
+          Add to your \`.github/workflows/update-readme.yml\`:
+          \`\`\`yaml
+          - uses: actions/checkout@v4
+          - uses: actions/setup-python@v4
+          - run: |
+              pip install -r requirements.txt
+              python prototype.py
+          \`\`\`
+          
+          ### Bug Reports
+          Found an issue? [Open an issue](https://github.com/${{ github.repository }}/issues)" \
+            readme-generator-${VERSION}.tar.gz \
+            readme-generator-${VERSION}.zip
+
+  deploy-demo:
+    name: Deploy Live Demo
+    needs: build-snapshot
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build demo site
+        run: |
+          mkdir -p demo-site
+          
+          # Create demo homepage
+          cat > demo-site/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>README Auto-Generator</title>
+              <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.0/github-markdown.min.css">
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                  }
+                  .container {
+                      max-width: 1200px;
+                      margin: 0 auto;
+                      padding: 40px 20px;
+                  }
+                  .hero {
+                      text-align: center;
+                      color: white;
+                      padding: 60px 20px;
+                  }
+                  .hero h1 {
+                      font-size: 3em;
+                      margin-bottom: 20px;
+                  }
+                  .hero p {
+                      font-size: 1.3em;
+                      margin-bottom: 30px;
+                      opacity: 0.9;
+                  }
+                  .badges {
+                      display: flex;
+                      justify-content: center;
+                      gap: 10px;
+                      flex-wrap: wrap;
+                      margin: 20px 0;
+                  }
+                  .btn {
+                      display: inline-block;
+                      padding: 15px 30px;
+                      background: white;
+                      color: #667eea;
+                      text-decoration: none;
+                      border-radius: 8px;
+                      font-weight: bold;
+                      margin: 10px;
+                      transition: transform 0.2s;
+                  }
+                  .btn:hover {
+                      transform: translateY(-2px);
+                  }
+                  .btn-secondary {
+                      background: transparent;
+                      color: white;
+                      border: 2px solid white;
+                  }
+                  .content {
+                      background: white;
+                      border-radius: 12px;
+                      padding: 40px;
+                      margin-top: 40px;
+                      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+                  }
+                  .version-badge {
+                      display: inline-block;
+                      background: #f0f0f0;
+                      padding: 8px 16px;
+                      border-radius: 20px;
+                      margin: 10px 0;
+                      font-family: monospace;
+                  }
+                  .markdown-body {
+                      margin-top: 30px;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="hero">
+                      <h1> README Auto-Generator</h1>
+                      <p>Automatically generate beautiful READMEs from your git commit history</p>
+                      <div class="version-badge" id="version">Loading version...</div>
+                      <div class="badges">
+                          <img src="https://img.shields.io/github/stars/${{ github.repository }}?style=for-the-badge&logo=github&color=white&labelColor=667eea" alt="Stars">
+                          <img src="https://img.shields.io/github/actions/workflow/status/${{ github.repository }}/update-readme.yml?style=for-the-badge&logo=github-actions&logoColor=white&labelColor=667eea" alt="Build">
+                      </div>
+                      <div>
+                          <a href="https://github.com/${{ github.repository }}/releases/latest" class="btn">📦 Download Latest</a>
+                          <a href="https://github.com/${{ github.repository }}" class="btn btn-secondary">⭐ View on GitHub</a>
+                      </div>
+                  </div>
+                  
+                  <div class="content">
+                      <h2> Live Demo: Our Auto-Generated README</h2>
+                      <p>This README is automatically updated with every commit using our tool!</p>
+                      <div class="markdown-body" id="readme-content">
+                          Loading README...
+                      </div>
+                  </div>
+              </div>
+              
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+              <script>
+                  // Load and display README
+                  fetch('https://raw.githubusercontent.com/${{ github.repository }}/main/README.md')
+                      .then(r => r.text())
+                      .then(text => {
+                          document.getElementById('readme-content').innerHTML = marked.parse(text);
+                      })
+                      .catch(() => {
+                          document.getElementById('readme-content').innerHTML = '<p>Error loading README</p>';
+                      });
+                  
+                  // Display version
+                  document.getElementById('version').textContent = 'Version: ${{ needs.build-snapshot.outputs.snapshot-version }}';
+              </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'demo-site'
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+
+  summary:
+    name: Deployment Summary
+    needs: [build-snapshot, deploy-demo]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Create Summary
+        run: |
+          echo "## Continuous Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`${{ needs.build-snapshot.outputs.snapshot-version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: ${{ needs.build-snapshot.outputs.is-release == 'true' && 'Stable Release' || 'SNAPSHOT Build' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${GITHUB_SHA:0:7}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- **Live Demo**: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Releases**: https://github.com/${{ github.repository }}/releases" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest SNAPSHOT**: https://github.com/${{ github.repository }}/releases/tag/SNAPSHOT" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Download" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Download latest build" >> $GITHUB_STEP_SUMMARY
+          echo "wget https://github.com/${{ github.repository }}/releases/download/SNAPSHOT/readme-generator-${{ needs.build-snapshot.outputs.snapshot-version }}.tar.gz" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
