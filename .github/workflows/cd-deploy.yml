@@ -154,11 +154,11 @@ jobs:
           
           **Not recommended for production use.** This build may be unstable or contain incomplete features.
           
-          ### 📦 Download
+          ### Download
           - **Linux/Mac**: \`readme-generator-${VERSION}.tar.gz\`
           - **Windows**: \`readme-generator-${VERSION}.zip\`
           
-          ### 🔧 Installation
+          ### Installation
           \`\`\`bash
           # Extract the archive
           tar -xzf readme-generator-${VERSION}.tar.gz
