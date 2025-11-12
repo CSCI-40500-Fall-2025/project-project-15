@@ -9,6 +9,6 @@ COPY prototype.py /prototype.py
 
 WORKDIR /github/workspace
 
-RUN git config --global --add safe.directory /github/workspace
+RUN git config --global --add safe.directory '*'
 
 ENTRYPOINT ["python", "/prototype.py"]
