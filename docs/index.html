@@ -14,7 +14,8 @@
 
         <div class="step">
             <h3>Step 1: Add OpenAI API Key</h3>
-            <p>If you don't have a key, you can sign up and create one at <a href="https://platform.openai.com/signup" target="_blank">OpenAI</a></p>
+            <p>If you don't have a key, you can sign up and create one at <a href="https://platform.openai.com/signup"
+                    target="_blank">OpenAI</a></p>
             <p>Go to repo → Settings → Secrets → Actions</p>
             <p>Click "New repository secret"</p>
             <p>Name: <code>OPENAI_API_KEY</code></p>
@@ -28,19 +29,23 @@
                 <textarea id="workflow" readonly>
 name: Update README
 on: [push]
+
 jobs:
-    update:
+  update:
     runs-on: ubuntu-latest
     permissions:
-        contents: write
-        pull-requests: write
+      contents: write
+      pull-requests: write
+    
     steps:
-        - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-            fetch-depth: 0
-        - uses: alemb210/readme-ai-action@v1
+          fetch-depth: 0
+      
+      - uses: alemb210/readme-ai-action@v1
         with:
-            openai-api-key: ${{ secrets.OPENAI_API_KEY }}</textarea>
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+                </textarea>
                 <button class="copy-button" id="copyButton" aria-label="Copy code to clipboard">
                     <span class="copy-text">📋 Copy</span>
                     <span class="copy-success" style="display: none;">✓ Copied!</span>
