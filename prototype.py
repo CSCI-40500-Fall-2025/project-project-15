@@ -3,11 +3,8 @@ import datetime
 import base64
 import requests
 import time
-from dotenv import load_dotenv
 from openai import OpenAI
 import git
-
-load_dotenv()
 
 _client = None
 
