@@ -1,8 +1,5 @@
 import os
 import datetime
-import base64
-import requests
-import time
 from openai import OpenAI
 import git
 
@@ -18,10 +15,31 @@ def get_openai_client():
         _client = OpenAI(api_key=openai_key)
     return _client
 
-def generate_readme(commits):
+def generate_readme(commits, existing_readme=""):
     """Generates README content based on commit messages"""
     commit_summary = "\n".join([f"- {commit}" for commit in commits])
-    prompt = f"""
+    
+    # Build the prompt with existing README context
+    if existing_readme.strip():
+        prompt = f"""
+    Based on these recent commit messages, update the existing README.md content:
+
+    Recent commits:
+    {commit_summary}
+
+    Existing README content:
+    {existing_readme}
+
+    Please:
+    1. Preserve any important existing information (project description, setup instructions, etc.)
+    2. Update or add new features based on the recent commits
+    3. Maintain consistency in tone and structure
+    4. Add new sections if the commits suggest new functionality
+    5. Keep all existing sections that are still relevant
+    Format the response in proper Markdown.
+    """
+    else:
+        prompt = f"""
     Based on these commit messages, generate a clear and informative README.md content:
 
     {commit_summary}
@@ -34,6 +52,7 @@ def generate_readme(commits):
     5. Usage examples if relevant
     Format the response in proper Markdown.
     """
+    
     try:
         client = get_openai_client()
         response = client.chat.completions.create(
@@ -42,7 +61,7 @@ def generate_readme(commits):
                 {"role": "system", "content": "You are a helpful assistant that generates README content from commit messages."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,
+            max_tokens=1200,
             temperature=0.7,
         )
         return response.choices[0].message.content.strip()
@@ -68,6 +87,11 @@ def count_files(project_path):
 def get_commits(repo_path=".", n=100):
     """Gets last n commits from git repo"""
     try:
+        # Fix git safe directory issue in containers
+        import subprocess
+        subprocess.run(["git", "config", "--global", "--add", "safe.directory", repo_path], 
+                      check=False, capture_output=True)
+        
         repo = git.Repo(repo_path)
         commits = []
         for commit in repo.iter_commits(max_count=n):
@@ -93,99 +117,6 @@ def parse_commit(commit):
         "type": type_commit, 
         "content": content
     }
-
-def create_pr_with_readme(readme_content, summary):
-    """Creates a pull request with the updated README using GitHub API"""
-    # Get GitHub token and repository info
-    token = os.getenv("GITHUB_TOKEN") 
-    repo = os.getenv("GITHUB_REPOSITORY")
-    
-    if not token or not repo:
-        print("GitHub token or repository not found. Skipping PR creation.")
-        return False
-    
-    api = "https://api.github.com"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    
-    try:
-        # Get default branch
-        r = requests.get(f"{api}/repos/{repo}", headers=headers)
-        r.raise_for_status()
-        base_branch = r.json()["default_branch"]
-        
-        # Get branch SHA
-        r = requests.get(f"{api}/repos/{repo}/git/ref/heads/{base_branch}", headers=headers)
-        r.raise_for_status()
-        sha = r.json()["object"]["sha"]
-        
-        # Create new branch
-        branch = f"readme-update-{int(time.time())}"
-        r = requests.post(
-            f"{api}/repos/{repo}/git/refs",
-            headers=headers,
-            json={"ref": f"refs/heads/{branch}", "sha": sha}
-        )
-        r.raise_for_status()
-        
-        # Prepare README content with summary
-        full_readme = f"{readme_content}\n\n---\n\n{summary}\n"
-        
-        # Base64 encoding is REQUIRED by GitHub Contents API
-        content_b64 = base64.b64encode(full_readme.encode()).decode()
-        
-        # Get current README SHA if it exists
-        readme_sha = None
-        try:
-            r = requests.get(
-                f"{api}/repos/{repo}/contents/README.md",
-                headers=headers,
-                params={"ref": branch}
-            )
-            if r.status_code == 200:
-                readme_sha = r.json()["sha"]
-        except requests.exceptions.RequestException:
-            pass  # File doesn't exist yet, that's fine
-        
-        # Update README on the new branch
-        update_data = {
-            "message": "docs: auto-update README",
-            "content": content_b64,
-            "branch": branch
-        }
-        if readme_sha:
-            update_data["sha"] = readme_sha
-        
-        r = requests.put(
-            f"{api}/repos/{repo}/contents/README.md",
-            headers=headers,
-            json=update_data
-        )
-        r.raise_for_status()
-        
-        # Create PR
-        r = requests.post(
-            f"{api}/repos/{repo}/pulls",
-            headers=headers,
-            json={
-                "title": "Auto-update README",
-                "head": branch,
-                "base": base_branch,
-                "body": "Automatically generated README update based on recent commits."
-            }
-        )
-        r.raise_for_status()
-        pr_url = r.json()["html_url"]
-        print(f"PR created: {pr_url}")
-        return True
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error creating PR: {str(e)}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Response: {e.response.text}")
-        return False
 
 if __name__ == "__main__":
     # Determine repo path (GitHub Actions uses /github/workspace, local uses .)
@@ -213,22 +144,25 @@ if __name__ == "__main__":
     else:
         commits = sample_commits
     
-    # Generate README content
-    readme_content = generate_readme(commits)
+    # Read existing README to preserve content
+    existing_readme = ""
+    try:
+        with open("README.md", "r") as f:
+            content = f.read()
+            # Extract just the README part (before the summary section)
+            if "---" in content:
+                existing_readme = content.split("---")[0].strip()
+            else:
+                existing_readme = content.strip()
+    except FileNotFoundError:
+        pass
     
-    # Try to create PR, fallback to writing file locally if GitHub API not available
-    pr_created = create_pr_with_readme(readme_content, summary)
+    # Generate README content with context from existing README
+    readme_content = generate_readme(commits, existing_readme)
     
-    if not pr_created:
-        # Fallback: write README locally (for local testing)
-        print("Writing README.md locally (PR creation not available)")
-        try:
-            with open("README.md", "r") as f:
-                existing_content = f.read()
-        except FileNotFoundError:
-            existing_content = ""
-        
-        with open("README.md", "w") as f:
-            if existing_content and not existing_content.endswith('\n'):
-                existing_content += '\n'
-            f.write(f"{readme_content}\n\n---\n\n{summary}\n")
+    # Write README directly to file
+    print("Writing updated README.md...")
+    with open("README.md", "w") as f:
+        f.write(f"{readme_content}\n\n---\n\n{summary}\n")
+    
+    print("README.md updated successfully!")

@@ -3,14 +3,11 @@ description: 'Auto-generate README from commits'
 
 inputs:
   openai-api-key:
+    description: 'OpenAI API key for generating README content'
     required: true
-  github-token:
-    required: true
-    default: ${{ github.token }}
 
 runs:
   using: 'docker'
   image: 'Dockerfile'
   env:
     OPENAI_API_KEY: ${{ inputs.openai-api-key }}
-    GITHUB_TOKEN: ${{ inputs.github-token }}
