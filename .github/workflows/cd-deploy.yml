@@ -228,7 +228,7 @@ jobs:
             readme-generator-${VERSION}.tar.gz \
             readme-generator-${VERSION}.zip
 
-  deploy-demo:
+  # deploy-demo:
     name: Deploy Live Demo
     needs: build-snapshot
     runs-on: ubuntu-latest
