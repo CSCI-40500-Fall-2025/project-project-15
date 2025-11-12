@@ -116,7 +116,7 @@ jobs:
           ## Troubleshooting
           
           - **No changes detected**: Make sure you have commits in your repository
-          - **API errors**: Verify your OPENAI_API_KEY is set correctly
+          - **API   s**: Verify your OPENAI_API_KEY is set correctly
           - **Permission errors**: Ensure GitHub Actions has write permissions
           EOF
           
