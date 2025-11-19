@@ -29,3 +29,8 @@ jobs:
       - name: Run tests
         run: |
           pytest test.py -v --tb=short
+
+      - name: Run prototype.py to demonstrate logging
+        run: |
+          python prototype.py || true
+        continue-on-error: true
