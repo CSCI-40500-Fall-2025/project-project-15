@@ -1,8 +1,10 @@
 import os
 import datetime
 import logging
-from logging import Logger
+from logging import Logger, Handler
 from typing import List, Tuple
+import requests
+import json
 
 import git
 
@@ -15,6 +17,44 @@ try:
     from logtail import LogtailHandler  # type: ignore
 except ImportError:
     LogtailHandler = None  # type: ignore
+
+
+class BetterStackHandler(Handler):
+    """Custom logging handler that sends logs to Better Stack using the direct API format."""
+    
+    def __init__(self, source_token: str, endpoint: str = "https://s1597068.eu-nbg-2.betterstackdata.com"):
+        super().__init__()
+        self.source_token = source_token
+        self.endpoint = endpoint
+        
+    def emit(self, record):
+        """Send log record to Better Stack."""
+        try:
+            # Format the log message
+            log_entry = {
+                "dt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "message": self.format(record),
+                "level": record.levelname,
+                "logger": record.name
+            }
+            
+            # Send to Better Stack
+            response = requests.post(
+                self.endpoint,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.source_token}"
+                },
+                json=log_entry,
+                timeout=5
+            )
+            
+            if response.status_code not in (200, 201, 204):
+                # Silently fail to avoid log loops
+                pass
+        except Exception:
+            # Silently fail to avoid log loops
+            pass
 
 _client = None
 LOGGER_NAME = "readme_automation"
@@ -42,15 +82,16 @@ def configure_logging() -> Logger:
 
     source_token = os.getenv("LOGTAIL_SOURCE_TOKEN")
     ci_active = os.getenv("CI")
-    if source_token and LogtailHandler is not None and not ci_active:
+    if source_token and not ci_active:
         try:
-            logtail_handler = LogtailHandler(source_token=source_token)
-            logtail_handler.setLevel(log_level)
-            logtail_handler.setFormatter(formatter)
-            logger.addHandler(logtail_handler)
-            logger.debug("Logtail handler initialized for real-time monitoring.")
+            # Use custom BetterStackHandler that matches the working curl format
+            betterstack_handler = BetterStackHandler(source_token=source_token)
+            betterstack_handler.setLevel(log_level)
+            betterstack_handler.setFormatter(formatter)
+            logger.addHandler(betterstack_handler)
+            logger.debug("Better Stack handler initialized for real-time monitoring.")
         except Exception as exc:
-            logger.warning("Unable to attach Logtail handler: %s", exc)
+            logger.warning("Unable to attach Better Stack handler: %s", exc)
     elif ci_active:
         logger.debug("CI environment detected; external log streaming disabled.")
 
