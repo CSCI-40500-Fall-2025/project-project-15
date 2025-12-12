@@ -230,6 +230,230 @@ def parse_commit(commit):
         "content": content
     }
 
+def generate_project_metadata(commits, file_count, file_names):
+    """Generate structured project metadata using ML (Task #1 enhancement)"""
+    commit_summary = "\n".join([f"- {commit}" for commit in commits[:20]])  # Limit for prompt size
+    file_extensions = set()
+    for file_list in file_names:
+        for filename in file_list:
+            if '.' in filename:
+                ext = filename.split('.')[-1].lower()
+                if ext not in ['md', 'txt', 'yml', 'yaml', 'json', 'gitignore']:
+                    file_extensions.add(ext)
+    
+    file_info = f"Total files: {file_count}, Extensions: {', '.join(sorted(file_extensions)[:10])}"
+    
+    prompt = f"""Based on these commit messages and project structure, generate structured metadata in JSON format:
+
+Commits:
+{commit_summary}
+
+Project structure: {file_info}
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "tags": ["tag1", "tag2", "tag3"],
+  "category": "category name",
+  "project_type": "type description",
+  "tech_stack": ["tech1", "tech2"],
+  "primary_language": "language",
+  "description": "brief one-line description"
+}}
+
+Rules:
+- tags: 3-5 relevant tags (lowercase, no spaces, use hyphens)
+- category: one of: "web-app", "cli-tool", "library", "automation", "devops", "data-science", "other"
+- project_type: brief description (e.g., "README automation tool", "API service")
+- tech_stack: list of technologies used (e.g., ["Python", "GitHub Actions", "OpenAI"])
+- primary_language: main programming language
+- description: one sentence describing the project
+
+Return ONLY the JSON, no markdown, no explanations."""
+
+    try:
+        start_time = datetime.datetime.now()
+        client = get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates structured project metadata. Always return valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=300,
+            temperature=0.3,  # Lower temperature for more consistent structured output
+        )
+        
+        latency_ms = int((datetime.datetime.now() - start_time).total_seconds() * 1000)
+        content = response.choices[0].message.content.strip()
+        
+        # Remove markdown code blocks if present
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        content = content.strip()
+        
+        metadata = json.loads(content)
+        metadata["ml_generated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        metadata["ml_model"] = "gpt-4"
+        metadata["ml_latency_ms"] = latency_ms
+        metadata["ml_status"] = "success"
+        metadata["ml_prompt_version"] = "v1"
+        
+        logger.info("Generated project metadata successfully (latency: %d ms).", latency_ms)
+        return metadata
+        
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse ML metadata JSON: %s. Raw response: %s", e, content[:200])
+        return {
+            "tags": ["automation", "readme"],
+            "category": "automation",
+            "project_type": "README automation tool",
+            "tech_stack": ["Python"],
+            "primary_language": "Python",
+            "description": "Auto-generates README from commit history",
+            "ml_status": "failed",
+            "ml_error": str(e),
+            "ml_generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error("Error generating project metadata: %s", e)
+        return {
+            "tags": ["automation", "readme"],
+            "category": "automation",
+            "project_type": "README automation tool",
+            "tech_stack": ["Python"],
+            "primary_language": "Python",
+            "description": "Auto-generates README from commit history",
+            "ml_status": "failed",
+            "ml_error": str(e),
+            "ml_generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+
+def save_metadata(metadata, filepath="project_metadata.json"):
+    """Save project metadata to JSON file"""
+    try:
+        # Read existing metadata if it exists to preserve history
+        existing_metadata = {}
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, "r") as f:
+                    existing_metadata = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                pass
+        
+        # Add generation history
+        if "generation_history" not in existing_metadata:
+            existing_metadata["generation_history"] = []
+        
+        existing_metadata["generation_history"].append({
+            "timestamp": metadata["ml_generated_at"],
+            "metadata": metadata
+        })
+        
+        # Keep only last 10 generations
+        if len(existing_metadata["generation_history"]) > 10:
+            existing_metadata["generation_history"] = existing_metadata["generation_history"][-10:]
+        
+        # Update current metadata
+        existing_metadata.update({
+            "tags": metadata.get("tags", []),
+            "category": metadata.get("category", "other"),
+            "project_type": metadata.get("project_type", ""),
+            "tech_stack": metadata.get("tech_stack", []),
+            "primary_language": metadata.get("primary_language", ""),
+            "description": metadata.get("description", ""),
+            "last_updated": metadata["ml_generated_at"],
+            "ml_model": metadata.get("ml_model", ""),
+            "ml_status": metadata.get("ml_status", "unknown")
+        })
+        
+        with open(filepath, "w") as f:
+            json.dump(existing_metadata, f, indent=2)
+        
+        logger.info("Saved project metadata to %s.", filepath)
+        return True
+    except Exception as e:
+        logger.error("Error saving metadata: %s", e)
+        return False
+
+def auto_commit_changes(repo_path, files_to_commit, commit_message):
+    """Auto-commit changes to git repository (Task #1: taking action)"""
+    try:
+        repo = git.Repo(repo_path)
+        
+        # Check if there are changes
+        if repo.is_dirty() or repo.untracked_files:
+            # Add files
+            for file in files_to_commit:
+                if os.path.exists(file):
+                    repo.index.add([file])
+                    logger.debug("Staged file: %s", file)
+            
+            # Create commit
+            commit = repo.index.commit(commit_message)
+            logger.info("Auto-committed changes: %s (commit: %s)", commit_message, commit.hexsha[:7])
+            
+            # Push if not in CI and AUTO_COMMIT is enabled
+            if os.getenv("AUTO_COMMIT_PUSH") == "true" and not os.getenv("CI"):
+                try:
+                    origin = repo.remote("origin")
+                    origin.push()
+                    logger.info("Pushed changes to remote repository.")
+                except Exception as e:
+                    logger.warning("Could not push to remote: %s", e)
+            
+            return True, commit.hexsha
+        else:
+            logger.debug("No changes to commit.")
+            return False, None
+            
+    except Exception as e:
+        logger.error("Error auto-committing changes: %s", e)
+        return False, None
+
+def track_metrics(metadata, readme_success=True):
+    """Track ML generation metrics"""
+    metrics_file = "ml_metrics.json"
+    
+    try:
+        metrics = {
+            "total_generations": 0,
+            "successful_generations": 0,
+            "failed_generations": 0,
+            "avg_latency_ms": 0,
+            "last_updated": None
+        }
+        
+        if os.path.exists(metrics_file):
+            with open(metrics_file, "r") as f:
+                metrics = json.load(f)
+        
+        metrics["total_generations"] += 1
+        if metadata.get("ml_status") == "success" and readme_success:
+            metrics["successful_generations"] += 1
+        else:
+            metrics["failed_generations"] += 1
+        
+        # Update average latency
+        if metadata.get("ml_latency_ms"):
+            current_avg = metrics.get("avg_latency_ms", 0)
+            total = metrics["total_generations"]
+            new_latency = metadata["ml_latency_ms"]
+            metrics["avg_latency_ms"] = int((current_avg * (total - 1) + new_latency) / total)
+        
+        metrics["last_updated"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        
+        with open(metrics_file, "w") as f:
+            json.dump(metrics, f, indent=2)
+        
+        logger.debug("Updated ML metrics: %d total, %d successful, avg latency: %d ms", 
+                    metrics["total_generations"], metrics["successful_generations"], 
+                    metrics["avg_latency_ms"])
+        
+    except Exception as e:
+        logger.warning("Error tracking metrics: %s", e)
+
 if __name__ == "__main__":
     # Determine repo path (GitHub Actions uses /github/workspace, local uses .)
     logger.info("Starting README automation run.")
@@ -272,12 +496,52 @@ if __name__ == "__main__":
         pass
     
     # Generate README content with context from existing README
+    readme_start_time = datetime.datetime.now()
     readme_content = generate_readme(commits, existing_readme)
+    readme_success = not readme_content.startswith("Error")
+    
+    # Generate structured project metadata (Task #1: Enhanced ML)
+    logger.info("Generating structured project metadata using ML...")
+    metadata = generate_project_metadata(commits, count, names)
+    
+    # Save metadata to file (Task #1: taking action - persisting ML output)
+    metadata_saved = save_metadata(metadata)
+    
+    # Track metrics
+    track_metrics(metadata, readme_success)
     
     # Write README directly to file
     logger.debug("Writing updated README.md with latest AI summary.")
     with open("README.md", "w") as f:
         f.write(f"{readme_content}\n\n---\n\n{summary}\n")
     
+    # Add metadata section to README for visibility
+    if metadata.get("ml_status") == "success":
+        metadata_section = f"\n\n## Project Metadata (AI-Generated)\n\n"
+        metadata_section += f"- **Category**: {metadata.get('category', 'N/A')}\n"
+        metadata_section += f"- **Type**: {metadata.get('project_type', 'N/A')}\n"
+        metadata_section += f"- **Tags**: {', '.join(metadata.get('tags', []))}\n"
+        metadata_section += f"- **Tech Stack**: {', '.join(metadata.get('tech_stack', []))}\n"
+        metadata_section += f"- **Primary Language**: {metadata.get('primary_language', 'N/A')}\n"
+        metadata_section += f"- **Description**: {metadata.get('description', 'N/A')}\n"
+        metadata_section += f"\n*Metadata generated by AI on {metadata.get('ml_generated_at', 'N/A')}*\n"
+        
+        # Insert before the --- separator
+        readme_with_metadata = readme_content + metadata_section + f"\n---\n\n{summary}\n"
+        with open("README.md", "w") as f:
+            f.write(readme_with_metadata)
+    
     logger.info("README.md updated successfully.")
-    #for committing
+    
+    # Task #1: Auto-commit changes (taking action on behalf of user)
+    if os.getenv("AUTO_COMMIT") != "false":  # Default to true unless explicitly disabled
+        files_to_commit = ["README.md", "project_metadata.json"]
+        commit_msg = f"docs: auto-update README and project metadata via ML\n\n- Generated metadata: {metadata.get('category', 'N/A')} project\n- Tags: {', '.join(metadata.get('tags', [])[:3])}\n- ML Status: {metadata.get('ml_status', 'unknown')}"
+        
+        committed, commit_sha = auto_commit_changes(repo_path, files_to_commit, commit_msg)
+        if committed:
+            logger.info("Successfully auto-committed ML-generated changes (commit: %s).", commit_sha[:7] if commit_sha else "N/A")
+        else:
+            logger.debug("Auto-commit skipped (no changes or disabled).")
+    else:
+        logger.debug("Auto-commit disabled via AUTO_COMMIT=false.")

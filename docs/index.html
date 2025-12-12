@@ -67,9 +67,46 @@ jobs:
 git commit -m "Add README automation"
 git push</code></pre>
         </div>
+
+        <div class="step" id="metadata-section" style="display: none;">
+            <h3>AI-Generated Project Metadata</h3>
+            <div id="metadata-content">
+                <p><strong>Category:</strong> <span id="metadata-category"></span></p>
+                <p><strong>Type:</strong> <span id="metadata-type"></span></p>
+                <p><strong>Tags:</strong> <span id="metadata-tags"></span></p>
+                <p><strong>Tech Stack:</strong> <span id="metadata-tech"></span></p>
+                <p><strong>Primary Language:</strong> <span id="metadata-language"></span></p>
+                <p><strong>Description:</strong> <span id="metadata-description"></span></p>
+                <p><em>Metadata generated automatically by ML component</em></p>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>
+    <script>
+        // Load and display project metadata if available
+        fetch('../project_metadata.json')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('Metadata not found');
+            })
+            .then(data => {
+                if (data.category) {
+                    document.getElementById('metadata-section').style.display = 'block';
+                    document.getElementById('metadata-category').textContent = data.category || 'N/A';
+                    document.getElementById('metadata-type').textContent = data.project_type || 'N/A';
+                    document.getElementById('metadata-tags').textContent = (data.tags || []).join(', ') || 'N/A';
+                    document.getElementById('metadata-tech').textContent = (data.tech_stack || []).join(', ') || 'N/A';
+                    document.getElementById('metadata-language').textContent = data.primary_language || 'N/A';
+                    document.getElementById('metadata-description').textContent = data.description || 'N/A';
+                }
+            })
+            .catch(error => {
+                console.log('Metadata not available:', error);
+            });
+    </script>
 </body>
 
 </html>
